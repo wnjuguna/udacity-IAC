@@ -1,0 +1,558 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: "Template to deploy udagram application"
+
+Parameters:        
+    EnvType:
+        Type: String
+        Description: Deploy Bastion host in public subnet in Dev env for troubleshooting
+        Default: Prod
+        AllowedValues: [Prod, Dev]
+        ConstraintDescription: Must be either Prod or Dev
+    KeyName:
+        Type: AWS::EC2::KeyPair::KeyName
+        Description: Key Pair for debugging EC2 instances
+        ConstraintDescription: Must be a valid key pair
+    InstanceType:
+        Type: String
+        Description: WWW server instance type
+        Default: t2.medium
+        AllowedValues:
+            - t1.micro
+            - t2.nano
+            - t2.micro
+            - t2.small
+            - t2.medium
+            - t2.large
+            - m1.small
+            - m1.medium
+            - m1.large
+            - m1.xlarge
+            - m2.xlarge
+            - m2.2xlarge
+            - m2.4xlarge
+            - m3.medium
+            - m3.large
+            - m3.xlarge
+            - m3.2xlarge
+            - m4.large
+            - m4.xlarge
+            - m4.2xlarge
+            - m4.4xlarge
+            - m4.10xlarge
+            - c1.medium
+            - c1.xlarge
+            - c3.large
+            - c3.xlarge
+            - c3.2xlarge
+            - c3.4xlarge
+            - c3.8xlarge
+            - c4.large
+            - c4.xlarge
+            - c4.2xlarge
+            - c4.4xlarge
+            - c4.8xlarge
+            - r3.large
+            - r3.xlarge
+            - r3.2xlarge
+            - r3.4xlarge
+            - r3.8xlarge
+            - i2.xlarge
+            - i2.2xlarge
+            - i2.4xlarge
+            - i2.8xlarge
+            - d2.xlarge
+            - d2.2xlarge
+            - d2.4xlarge
+            - d2.8xlarge
+            - hi1.4xlarge
+            - hs1.8xlarge
+            - cr1.8xlarge
+            - cc2.8xlarge
+            - cg1.4xlarge
+        ConstraintDescription: Must be a valid instance type
+    TrustedHosts:
+        Type: String
+        Description: Permit SSH access from trusted hosts only
+        Default: 0.0.0.0/0
+        AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+        ConstraintDescription: Must be a valid IP address or subnet in cidr format
+    VPCSubnet:
+        Type: String
+        Description: VPC subnet
+        Default: '10.10.10.0/24'
+        AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+        ConstraintDescription: Must be a valid subnet in cidr format
+    FleetSize:
+        Type: String
+        Description: Number Application server instances
+        Default: 4
+        AllowedPattern: '[2-4]'
+        ConstraintDescription: Minumum number is 4 servers.
+Conditions:
+    CreateDevResources: !Equals [!Ref EnvType, Dev]
+Mappings:
+    AWSInstanceType2Arch:
+        t1.micro:
+            Arch : HVM64
+        t2.nano:
+            Arch : HVM64
+        t2.micro:
+            Arch : HVM64
+        t2.small:
+            Arch : HVM64
+        t2.medium:
+            Arch : HVM64
+        t2.large:
+            Arch : HVM64
+        m1.small    :
+            Arch : HVM64
+        m1.medium:
+            Arch : HVM64
+        m1.large:
+            Arch : HVM64
+        m1.xlarge:
+            Arch : HVM64
+        m2.xlarge:
+            Arch : HVM64
+        m2.2xlarge:
+            Arch : HVM64
+        m2.4xlarge:
+            Arch : HVM64
+        m3.medium:
+            Arch : HVM64
+        m3.large:
+            Arch : HVM64
+        m3.xlarge:
+            Arch : HVM64
+        m3.2xlarge:
+            Arch : HVM64
+        m4.large:
+            Arch : HVM64
+        m4.xlarge:
+            Arch : HVM64
+        m4.2xlarge:
+            Arch : HVM64
+        m4.4xlarge:
+            Arch : HVM64
+        m4.10xlarge:
+            Arch : HVM64
+        c1.medium:
+            Arch : HVM64
+        c1.xlarge:
+            Arch : HVM64
+        c3.large:
+            Arch : HVM64
+        c3.xlarge:
+            Arch : HVM64
+        c3.2xlarge:
+            Arch : HVM64
+        c3.4xlarge:
+            Arch : HVM64
+        c3.8xlarge:
+            Arch : HVM64
+        c4.large:
+            Arch : HVM64
+        c4.xlarge:
+            Arch : HVM64
+        c4.2xlarge:
+            Arch : HVM64
+        c4.4xlarge:
+            Arch : HVM64
+        c4.8xlarge:
+            Arch : HVM64
+        r3.large:
+            Arch : HVM64
+        r3.xlarge:
+            Arch : HVM64
+        r3.2xlarge:
+            Arch : HVM64
+        r3.4xlarge:
+            Arch : HVM64
+        r3.8xlarge:
+            Arch : HVM64
+        i2.xlarge:
+            Arch : HVM64
+        i2.2xlarge:
+            Arch : HVM64
+        i2.4xlarge:
+            Arch : HVM64
+        i2.8xlarge:
+            Arch : HVM64
+        d2.xlarge:
+            Arch : HVM64
+        d2.2xlarge:
+            Arch : HVM64
+        d2.4xlarge:
+            Arch : HVM64
+        d2.8xlarge:
+            Arch : HVM64
+        hi1.4xlarge:
+            Arch : HVM64
+        hs1.8xlarge:
+            Arch : HVM64
+        cr1.8xlarge:
+            Arch : HVM64
+        cc2.8xlarge:
+            Arch : HVM64
+    AWSRegionArch2AMI:
+        us-east-1   :
+            HVM64 : ami-046842448f9e74e7d
+        us-west-2   :
+            HVM64 : ami-0edf3b95e26a682df
+        us-west-1   :
+            HVM64 : ami-0d58800f291760030
+        eu-west-1   :
+            HVM64 : ami-07042e91d04b1c30d
+        eu-west-2   :
+            HVM64 : ami-04cc79dd5df3bffca
+        eu-west-3   :
+            HVM64 : ami-0c367ebddcf279dc6
+        eu-central-1:
+            HVM64 : ami-0718a1ae90971ce4d
+        eu-north-1  :
+            HVM64 : ami-0e850e0e9c20d9deb
+        ap-northeast-1:
+            HVM64 : ami-01f90b0460589991e
+        ap-northeast-2:
+            HVM64 : ami-096e3ded41e3bda6a
+        ap-northeast-3:
+            HVM64 : ami-0942fd36e1571cbdf
+        ap-southeast-1:
+            HVM64 : ami-07ce5f60a39f1790e
+        ap-southeast-2:
+            HVM64 : ami-04c7af7de7ad468f0
+        ap-south-1  :
+            HVM64 : ami-0d11056c10bfdde69
+        us-east-2   :
+            HVM64 : ami-0367b500fdcac0edc
+        ca-central-1:
+            HVM64 : ami-064efdb82ae15e93f
+        sa-east-1   :
+            HVM64 : ami-0cb1ddea3786f6c0d
+Resources:
+    VPC:
+        Type: AWS::EC2::VPC
+        Properties:
+            CidrBlock:
+                Ref: VPCSubnet
+    VPCGW:
+        Type: AWS::EC2::VPCGatewayAttachment
+        Properties:
+            VpcId:
+                Ref: VPC
+            InternetGatewayId:
+                Ref: InternetGW
+    UdacityS3ReadOnlyEC2:
+        Type: AWS::IAM::Role
+        Properties:
+            Description: WWW server role
+            AssumeRolePolicyDocument: 
+                Version: "2012-10-17"
+                Statement:
+                    Effect: Allow
+                    Principal:
+                        Service:
+                            - ec2.amazonaws.com
+                    Action:
+                        - "sts:AssumeRole"
+    RolePolicy:
+        Type: AWS::IAM::Policy
+        Properties:
+            PolicyName: s3ReadOnly
+            PolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                    Effect: Allow
+                    Action: 
+                        - "s3:Get*"
+                        - "s3:List*"
+                    Resource: "*"
+            Roles:
+                - Ref: "UdacityS3ReadOnlyEC2"            
+    WWWInstanceProfile:
+        Type: AWS::IAM::InstanceProfile
+        Properties:
+            Roles:
+                - Ref: "UdacityS3ReadOnlyEC2"
+#AZ1 and AZ2 Public subnets                 
+    PublicSubnet1:
+        Type: AWS::EC2::Subnet
+        Properties:
+            VpcId:
+                Ref: VPC
+            CidrBlock: !Select [0, !Cidr [ !GetAtt VPC.CidrBlock, 4, 6]]
+            AvailabilityZone: !Select [0, !GetAZs ""]
+    PublicSubnet2:
+        Type: AWS::EC2::Subnet
+        Properties:
+            VpcId:
+                Ref: VPC
+            CidrBlock: !Select [1, !Cidr [ !GetAtt VPC.CidrBlock, 4, 6]]
+            AvailabilityZone: !Select [1, !GetAZs ""]
+#AZ1 and AZ2 Private subnets                             
+    PrivateSubnet1:
+        Type: AWS::EC2::Subnet
+        Properties:
+            VpcId:
+                Ref: VPC
+            CidrBlock: !Select [2, !Cidr [ !GetAtt VPC.CidrBlock, 4, 6]]
+            AvailabilityZone: !Select [0, !GetAZs ""]
+    PrivateSubnet2:
+        Type: AWS::EC2::Subnet
+        Properties:
+            VpcId:
+                Ref: VPC
+            CidrBlock: !Select [3, !Cidr [ !GetAtt VPC.CidrBlock, 4, 6]]
+            AvailabilityZone: !Select [1, !GetAZs ""]
+#Route tables
+    PublicRT1:
+        Type: AWS::EC2::RouteTable
+        Properties:
+            VpcId: 
+                Ref: VPC
+    PrivateRT1:
+        Type: AWS::EC2::RouteTable
+        Properties:
+            VpcId:
+                Ref: VPC
+    PrivateRT2:
+        Type: AWS::EC2::RouteTable
+        Properties:
+            VpcId:
+                Ref: VPC
+#Routes                
+    DefaultRoute:
+        Type: AWS::EC2::Route
+        Properties:
+            RouteTableId:
+                Ref: PublicRT1
+            DestinationCidrBlock: 0.0.0.0/0
+            GatewayId:
+                Ref: InternetGW
+    NATGW1Route:
+        Type: AWS::EC2::Route
+        Properties:
+            RouteTableId:
+                Ref: PrivateRT1
+            DestinationCidrBlock: 0.0.0.0/0
+            NatGatewayId:
+                Ref: NatGW1
+    NATGW2Route:
+        Type: AWS::EC2::Route
+        Properties:
+            RouteTableId:
+                Ref: PrivateRT2
+            DestinationCidrBlock: 0.0.0.0/0
+            NatGatewayId:
+                Ref: NatGW2
+#RouteTable Association
+    PublicSubnet1Association:
+        Type: AWS::EC2::SubnetRouteTableAssociation
+        Properties: 
+            RouteTableId: !Ref PublicRT1
+            SubnetId: !Ref PublicSubnet1
+    PublicSubnet2Association:
+        Type: AWS::EC2::SubnetRouteTableAssociation
+        Properties: 
+            RouteTableId: !Ref PublicRT1
+            SubnetId: !Ref PublicSubnet2
+    PrivateSubnet1Association:
+        Type: AWS::EC2::SubnetRouteTableAssociation
+        Properties: 
+            RouteTableId: !Ref PrivateRT1
+            SubnetId: !Ref PrivateSubnet1
+    PrivateSubnet2Association:
+        Type: AWS::EC2::SubnetRouteTableAssociation
+        Properties: 
+            RouteTableId: !Ref PrivateRT2
+            SubnetId: !Ref PrivateSubnet2
+#Gateways and EIPs               
+    InternetGW:
+        Type: AWS::EC2::InternetGateway
+    NatGW1:
+        Type: AWS::EC2::NatGateway
+        Properties:
+            AllocationId: !GetAtt EIP1.AllocationId
+            SubnetId:
+                Ref: PublicSubnet1
+    NatGW2:
+        Type: AWS::EC2::NatGateway
+        Properties:
+            AllocationId: !GetAtt EIP2.AllocationId
+            SubnetId:
+                Ref: PublicSubnet2
+    EIP1:
+        Type: AWS::EC2::EIP
+        Properties:
+            Domain: vpc            
+    EIP2:
+        Type: AWS::EC2::EIP
+        Properties:
+            Domain: vpc
+    EIP3:
+        Type: AWS::EC2::EIP
+        Condition: CreateDevResources
+        Properties:
+            Domain: vpc        
+#Security Groups
+    BastionSecurityGroup: 
+        Type: AWS::EC2::SecurityGroup
+        Condition: CreateDevResources
+        Properties:
+                GroupDescription: BastionHost security group
+                VpcId:
+                    Ref: VPC
+                SecurityGroupIngress:
+                    - IpProtocol: tcp
+                      CidrIp:
+                        Ref: TrustedHosts
+                      FromPort: 22
+                      ToPort: 22                    
+    WWWSecurityGroup: 
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+                GroupDescription: WWW server security group
+                VpcId:
+                    Ref: VPC
+                SecurityGroupIngress:
+                    - IpProtocol: tcp
+                      CidrIp: 0.0.0.0/0
+                      FromPort: 22
+                      ToPort: 22
+                    - IpProtocol: tcp
+                      CidrIp: 0.0.0.0/0
+                      FromPort: 80
+                      ToPort: 80
+    ELBSecurityGroup: 
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+                GroupDescription: ELB security group
+                VpcId:
+                    Ref: VPC
+                SecurityGroupIngress:
+                    - IpProtocol: tcp
+                      CidrIp: 0.0.0.0/0
+                      FromPort: 80
+                      ToPort: 80
+                SecurityGroupEgress:
+                    - IpProtocol: tcp
+                      CidrIp: 0.0.0.0/0
+                      FromPort: 80
+                      ToPort: 80
+#BastionHost
+    BastionHostEIP:
+        Type: AWS::EC2::EIPAssociation
+        Condition: CreateDevResources
+        Properties: 
+            AllocationId: !GetAtt EIP3.AllocationId
+            InstanceId: 
+                Ref: BastionHost
+    BastionHost:
+        Type: AWS::EC2::Instance
+        Condition: CreateDevResources
+        Properties:
+            AvailabilityZone: !Select [0, !GetAZs ""]
+            ImageId: !FindInMap
+                - AWSRegionArch2AMI
+                - Ref: AWS::Region
+                - !FindInMap
+                    - AWSInstanceType2Arch
+                    - Ref: InstanceType
+                    - Arch
+            InstanceType:
+                Ref: InstanceType
+            KeyName: 
+                Ref: KeyName
+            SecurityGroupIds:
+                - Ref: BastionSecurityGroup
+            SubnetId:
+                Ref: PublicSubnet1
+#Application servers
+    WWWLaunchConfiguration:
+        Type: AWS::AutoScaling::LaunchConfiguration
+        Properties:
+            IamInstanceProfile: 
+                Ref: WWWInstanceProfile
+            ImageId: !FindInMap
+                - AWSRegionArch2AMI
+                - Ref: AWS::Region
+                - !FindInMap
+                    - AWSInstanceType2Arch
+                    - Ref: InstanceType
+                    - Arch
+            InstanceType:
+                Ref: InstanceType
+            BlockDeviceMappings:
+                - DeviceName: /dev/sdf
+                  Ebs:
+                    VolumeSize: 10
+                    VolumeType: standard 
+            KeyName: !If [ CreateDevResources, !Ref KeyName, !Ref 'AWS::NoValue']
+            SecurityGroups:
+                - Ref: WWWSecurityGroup
+            UserData: 
+                'Fn::Base64': !Sub |
+                    #!/bin/bash
+                    apt-get update -y
+                    apt-get install unzip awscli -y
+                    apt-get install apache2 -y
+                    systemctl start apache2.service
+                    cd /var/www/html
+                    aws s3 cp s3://udacity-demo-1/udacity.zip .
+                    unzip -o udacity.zip
+    AutoscalingGroup:
+        Type: AWS::AutoScaling::AutoScalingGroup
+        Properties:
+            LaunchConfigurationName: 
+                Ref: WWWLaunchConfiguration
+            HealthCheckType: ELB
+            HealthCheckGracePeriod: 120
+            TargetGroupARNs:
+                - Ref: WWWTargetGroup
+            VPCZoneIdentifier:
+                - Ref: PrivateSubnet1
+                - Ref: PrivateSubnet2
+            MinSize:
+                Ref: FleetSize
+            MaxSize:
+                Ref: FleetSize
+#Elastic LoadBalancers
+    WWWTargetGroup:
+        Type: AWS::ElasticLoadBalancingV2::TargetGroup
+        Properties:
+            Protocol: HTTP
+            Port: 80
+            VpcId:
+                Ref: VPC
+    WWWListener:
+        Type: AWS::ElasticLoadBalancingV2::Listener
+        Properties:
+            DefaultActions:
+                - Type: forward
+                  TargetGroupArn: 
+                    Ref: WWWTargetGroup 
+            LoadBalancerArn:
+                Ref: ELB
+            Protocol: HTTP
+            Port: 80
+             
+    ELB:
+        Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+        Properties:
+            Type: application
+            SecurityGroups:
+                - Ref: ELBSecurityGroup
+            Subnets:
+                - Ref: PublicSubnet1
+                - Ref: PublicSubnet2
+            
+Outputs:
+    BastionIP:
+        Description: Bastion host public ip (Dev only)
+        Condition: CreateDevResources
+        Value: !Ref EIP3
+    URL:
+        Description: Loadbalancer URL
+        Value: !Join ["", ["http://", !GetAtt ELB.DNSName]]
+        
