@@ -1,4 +1,4 @@
-# Udacity Cloud Computing: Infrastructure as Code Project
+# Udacity Cloud Computing: Infrastructure As Code project
  This cloud formation template will deploy a webapp on the following infrastructure:
  - VPC
  - s3 read-only IAM role
@@ -19,7 +19,11 @@
 
 ## How to deploy:
  - Run the following aws-cli command:
-  aws cloudformation create-stack --stack-name udagram --parameters ParameterKey=KeyName,ParameterValue=udacity-www-ec2 ParameterKey=TrustedHosts,ParameterValue=102.140.215.137/32 --capabilities CAPABILITY_IAM --template-body file:///mnt/c/Users/williamn/Documents/Udacity/IAC/udagram.yml
+ ```bash
+ aws cloudformation create-stack --stack-name udagram --parameters ParameterKey=KeyName,ParameterValue=udacity-www-ec2 ParameterKey=TrustedHosts,ParameterValue=102.140.215.137/32 --capabilities CAPABILITY_IAM --template-body file:///mnt/c/Users/williamn/Documents/Udacity/IAC/udagram.yml
+```
 ## How to destroy stack
  - Run the following aws-cli command:
-  aws cloudformation delete-stack --stack-name udagram
+ ```bash
+ aws cloudformation delete-stack --stack-name udagram
+```
